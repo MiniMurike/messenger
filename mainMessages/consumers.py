@@ -81,17 +81,22 @@ class ChatConsumer(WebsocketConsumer):
                 return
 
             self._get_users(text_data_json)
-        elif type == 'create_chat':
-            user = User.objects.get(id=text_data_json['user_id'])
-            p_user = UserProfile.objects.get(user=user)
-            chat = Chat.objects.create(
-                title=text_data_json['title'],
-            )
-            ChatUser.objects.create(
-                chat=chat,
-                user=p_user,
-            )
-            self.send(json.dumps({'type': 'reload'}))
+        elif type == 'get_messages':
+            chat_id = text_data_json['chat_id']
+
+            chat = Chat.objects.get(id=chat_id).chat_messages.all()
+            response = {'type': 'get_messages'}
+            data = []
+            for value in chat:
+                data.append({
+                    'user_nickname': value.sender.nickname,
+                    'user_id': value.sender.user.id,
+                    'message': value.text,
+                    'avatar': value.sender.avatar.url,
+                })
+            response['data'] = data
+
+            self.send(json.dumps(response))
 
     def _get_users(self, data):
         chat_users = ChatUser.objects.filter(chat__id=data['chat_id'])
@@ -142,14 +147,11 @@ class ChatConsumer(WebsocketConsumer):
         self.send(text_data=json.dumps(event))
 
 
-class MessageConsumer(WebsocketConsumer):
+class ChatCreateConsumer(WebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.chat_id = None
 
     def connect(self):
-        self.chat_id = self.scope['url_route']['kwargs']['chat_id']
-
         self.accept()
 
     def disconnect(self, close_code):
@@ -157,16 +159,14 @@ class MessageConsumer(WebsocketConsumer):
 
     def receive(self, text_data=None, bytes_data=None):
         text_data_json = json.loads(text_data)
-        chat_id = text_data_json['chat_id']
 
-        chat = Chat.objects.get(id=chat_id).chat_messages.all()
-        response = [{'type': 'get_messages'}]
-        for value in chat:
-            response.append({
-                'user_nickname': value.sender.nickname,
-                'user_id': value.sender.user.id,
-                'message': value.text,
-                'avatar': value.sender.avatar.url,
-            })
-
-        self.send(json.dumps(response))
+        user = User.objects.get(id=text_data_json['user_id'])
+        p_user = UserProfile.objects.get(user=user)
+        chat = Chat.objects.create(
+            title=text_data_json['title'],
+        )
+        ChatUser.objects.create(
+            chat=chat,
+            user=p_user,
+        )
+        self.send(json.dumps({'type': 'chat_created'}))

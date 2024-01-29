@@ -7,18 +7,20 @@ function chat_connect() {
 
     chatSocket.onopen = e => {
         console.log('[CHAT] WebSocket successfully connected!');
-        chatSocket.send(JSON.stringify({
-            'type': 'get_users',
-            'chat_id': chatId,
-        }));
+        if (chatId) {
+            chatSocket.send(JSON.stringify({
+                'type': 'get_messages',
+                'chat_id': chatId,
+            }))
+            chatSocket.send(JSON.stringify({
+                'type': 'get_users',
+                'chat_id': chatId,
+            }));
+        }
     }
 
     chatSocket.onclose = e => {
         console.log('[CHAT] Lost connection to server');
-        // setTimeout(function() {
-        //     console.log('[CHAT] Trying to reconnect...');
-        //     chat_connect();
-        // }, 2000);
     }
 
     chatSocket.onmessage = e => {
@@ -28,6 +30,10 @@ function chat_connect() {
             case "message_send":
                 createNewMessage(data);
                 break;
+            case 'get_messages':
+                get_chat_messages(data['data'])
+                console.log('[CHAT] Old messages successfully loaded');
+                break;
             case "get_users":
                 get_users_list(data);
                 break;
@@ -35,6 +41,7 @@ function chat_connect() {
                 location = '/';
                 break;
             default:
+                console.log(data)
                 console.error('[CHAT] Unknown message type!');
                 break;
         }
@@ -45,63 +52,13 @@ function chat_connect() {
     }
 }
 
-function get_messages() {
-    chatSocket = new WebSocket(`ws://127.0.0.1:8000/ws/messages/${chatId}/`);
-
-    chatSocket.onopen = e => {
-        console.log('[MESSAGES] WebSocket successfully connected!');
-        console.log('[MESSAGES] Get chat\'s messages');
-
-        let intervalId = setInterval(function() {
-            if (chatSocket.readyState === chatSocket.OPEN) {
-                clearInterval(intervalId);
-                chatSocket.send(JSON.stringify({
-                    "chat_id": chatId
-                }));
-            }
-        }, 1000);
-    }
-
-    chatSocket.onclose = e => {
-        console.log('[MESSAGES] Closing socket')
-    }
-
-    chatSocket.onerror = e => {
-        console.log('[MESSAGES] Caught an error! Closing the socket');
-    }
-
-    chatSocket.onmessage = e => {
-        const data = JSON.parse(e.data);
-        console.log(data);
-
-        switch (data[0].type) {
-            case "get_messages":
-                get_chat_messages(data)
-                console.log('[MESSAGES] Old messages successfully loaded. Closing connection');
-                chatSocket.close();
-                break;
-            default:
-                console.error('[MESSAGES] Unknown message type!');
-                break;
-        }
-    }
-}
-
 function selectChat(data) {
-    // data.target.children[0].innerHTML
     document.querySelector('.selected-chat').className = 'chat-list-item';
     data.target.className += ' selected-chat';
     updateSelectedChatId();
     chatSocket.close();
 
-    get_messages();
-
-    let intervalId = setInterval(function() {
-        if (chatSocket.readyState === chatSocket.CLOSED) {
-            clearInterval(intervalId);
-            chat_connect();
-        }
-    }, 1000);
+    chat_connect();
 }
 
 function updateSelectedChatId() {
@@ -134,7 +91,7 @@ function createNewMessage(data) {
 
 function get_chat_messages(data) {
     chatField.innerHTML = '';
-    for (let i = 1; i < data.length; i++) {
+    for (let i = 0; i < data.length; i++) {
         createNewMessage(data[i]);
     }
 }
@@ -148,11 +105,28 @@ function createChat() {
         alert('Название слишком короткое, необходимо хотя бы 5 символов');
         return null;
     }
-    chatSocket.send(JSON.stringify({
-        "type": 'create_chat',
-        'title': title,
-        'user_id': userId,
-    }));
+    let chatCreateSocket = new WebSocket('ws://127.0.0.1:8000/ws/chat-create/');
+
+    chatCreateSocket.onopen = e => {
+        console.log('[CREATE-CHAT] Socket has been opened');
+        chatCreateSocket.send(JSON.stringify({
+            "type": 'create_chat',
+            'title': title,
+            'user_id': userId,
+        }));
+    }
+    chatCreateSocket.onmessage = e => {
+        const data = JSON.parse(e.data)
+        switch (data.type) {
+            case 'chat_created':
+                location = '/';
+                break;
+            default:
+                console.log('[CREATE-CHAT] Got unknown message type');
+                break;
+        }
+        chatCreateSocket.close();
+    }
 }
 
 function get_users_list(data) {
@@ -182,34 +156,32 @@ function change_user(data) {
         "user_id": textInputValue,
         "chat_id": chatId,
     }));
+    document.querySelector('.text-input').value = '';
 }
 
 window.onload = () => {
     let textInput = document.querySelector('#textInput');
+    textInput.focus();
     let sendButton = document.querySelector('#sendButton');
     chatField = document.querySelector('#chat')
-    document.querySelector('#chat-create-button').onclick = createChat;
-    try {
-        document.querySelector('.chat-list-item').className += ' selected-chat';
-    } catch (e) {
-        console.log(e);
-        chatField.innerHTML = 'Видимо, вы ещё не состоите ни в одном чате';
-        return null;
-    }
-    updateSelectedChatId();
 
-    document.querySelector('#add-user').onclick = change_user;
-    document.querySelector('#remove-user').onclick = change_user;
+    document.querySelector('#chat-create-button').onclick = createChat;
+    let firstChatItem = document.querySelector('.chat-list-item')
+    if (firstChatItem) {
+        firstChatItem.className += ' selected-chat';
+        updateSelectedChatId();
+        document.querySelector('#add-user').onclick = change_user;
+        document.querySelector('#remove-user').onclick = change_user;
+    }
 
     let elements = document.getElementsByClassName('chat-list-item')
     for (let i = 0; i < elements.length; i++) {
         elements[i].onclick = selectChat;
     }
 
-    textInput.focus();
-
     sendButton.onclick = () => {
         if (textInput.value.length === 0) return;
+        if (chatId === null) return;
 
         chatSocket.send(JSON.stringify({
             "type": 'send_message',
@@ -220,12 +192,9 @@ window.onload = () => {
         textInput.value = "";
     }
 
-    get_messages();
-
-    let intervalId = setInterval(function() {
-        if (chatSocket.readyState === chatSocket.CLOSED) {
-            clearInterval(intervalId);
-            chat_connect();
-        }
-    }, 1000);
+    if (chatId) {
+        chat_connect();
+    } else {
+        chatField.innerHTML = 'Выглядит как будто вы не состоите в каком либо чате';
+    }
 }
