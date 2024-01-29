@@ -196,5 +196,6 @@ window.onload = () => {
         chat_connect();
     } else {
         chatField.innerHTML = 'Выглядит как будто вы не состоите в каком либо чате';
+        document.querySelector('#users-block').style = 'display: none';
     }
 }
