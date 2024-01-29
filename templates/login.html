@@ -1,0 +1,20 @@
+{% extends 'flatpages/default.html' %}
+
+{% block title %}
+Логин
+{% endblock title %}
+
+{% block content %}
+
+{% if user.is_authenticated %}
+<script>
+  location = '/'
+</script>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit">Залогиниться</button>
+</form>
+{% endblock content %}

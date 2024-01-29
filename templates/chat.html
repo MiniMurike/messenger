@@ -1,0 +1,52 @@
+{% extends 'flatpages/default.html' %}
+{% load static %}
+
+{% block title %}
+Чат
+{% endblock title %}
+
+
+{% block scripts %}
+<script>
+    let userId = {{ request.user.id }}
+</script>
+<script src="{% static 'js/chat.js' %}"></script>
+{% endblock scripts %}
+
+
+{% block content %}
+
+<div id="content">
+    <div id="temp">
+        <div id="users-block">
+            <div id="users-list">
+                Loading users list...
+            </div>
+            <div id="users-action">
+                <input type="text" class="users-action text-input" placeholder="ID пользователя">
+                <button id="add-user" name="add_user">Добавить</button>
+                <button id="remove-user" name="delete_user">Удалить</button>
+            </div>
+        </div>
+        <div id="chat-content">
+            <div id="chat">
+                Loading chat history...
+            </div>
+            <div id="send-field">
+                <textarea id="textInput"></textarea>
+                <button id ="sendButton"><img src="/static/img/send.png"></button>
+            </div>
+        </div>
+        <div id="chat-list">
+            <div id="chat-create-button">Создать чат</div>
+            {% for chat in chat_list %}
+            <div class="chat-list-item">
+                <div style="display: none" id="chat_id">{{ chat.id }}</div>
+                {{ chat.title }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

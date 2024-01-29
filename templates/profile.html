@@ -1,0 +1,29 @@
+{% extends 'flatpages/default.html' %}
+{% load static %}
+
+{% block title %}
+Профиль
+{% endblock title %}
+
+{% block styles %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+{% endblock styles %}
+
+{% block content %}
+<div id="profile-content">
+    <div id="user-data">
+        [{{ p_user.user.id }}] {{ p_user.nickname }}
+        <img src="{{ p_user.avatar.url }}">
+    </div>
+    <hr style="width: 100%; border: 1px solid grey">
+    <div id="update-user-data">
+        <h1>Изменить данные</h1>
+        <form enctype="multipart/form-data" method="post">
+            {% csrf_token %}
+            <h3>Аватар</h3><input type="file" name="avatar">
+            <h3>Никнейм</h3><input type="text" name="nickname" value="{{ p_user.nickname }}">
+            <button type="submit">Обновить всё</button>
+        </form>
+    </div>
+</div>
+{% endblock content %}
